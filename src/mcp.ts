@@ -61,7 +61,7 @@ export function createMcpServer(env: Env): McpServer {
     annotations: { readOnlyHint: true, title: "Oura health brief" },
   }, async ({ days }) => {
     try {
-      const end = new Date(), start = new Date(end.getTime() - days * 86_400_000)
+      const end = new Date(), start = new Date(end.getTime() - (days - 1) * 86_400_000) // inclusive range: days rows incl. today
       const range = { start_date: start.toISOString().slice(0, 10), end_date: end.toISOString().slice(0, 10) }
       const names = ["daily_sleep", "daily_readiness", "daily_activity", "daily_spo2", "sleep"] as const
       const results = await Promise.all(names.map(async (collection) => {
