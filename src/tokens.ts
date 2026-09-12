@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers"
-import { TOKEN_URL } from "./oura.js"
+import { readBody, TOKEN_URL } from "./oura.js"
 
 export interface Env {
   OURA_CLIENT_ID: string
@@ -16,10 +16,7 @@ export const tokensFor = (env: Env) => env.OURA_TOKENS.getByName("owner")
 type TokenSet = { accessToken: string; refreshToken: string; expiresAt: number }
 type AuthState = { state: string; createdAt: number }
 
-const responseBody = async (response: Response): Promise<unknown> => {
-  const text = await response.text()
-  try { return JSON.parse(text) } catch { return text || undefined }
-}
+const notAuthorized = (env: Env) => new Error(`Not authorized. Visit ${new URL(env.OURA_REDIRECT_URI).origin}/oauth/start once.`)
 
 export class OuraTokens extends DurableObject<Env> {
   private inflight?: Promise<string>
@@ -44,7 +41,7 @@ export class OuraTokens extends DurableObject<Env> {
   async getAccessToken(): Promise<string> {
     const tokens = await this.ctx.storage.get<TokenSet>("tokens")
     if (tokens && tokens.expiresAt - Date.now() > 60_000) return tokens.accessToken
-    if (!tokens) throw new Error(`Not authorized. Visit ${new URL(this.env.OURA_REDIRECT_URI).origin}/oauth/start?token=<MCP_BEARER> once.`)
+    if (!tokens) throw notAuthorized(this.env)
     if (!this.inflight) this.inflight = this.refresh(tokens.refreshToken).finally(() => { this.inflight = undefined })
     return this.inflight
   }
@@ -61,6 +58,8 @@ export class OuraTokens extends DurableObject<Env> {
 
   private async refresh(refreshToken: string): Promise<string> {
     const tokens = await this.postToken({ grant_type: "refresh_token", refresh_token: refreshToken }, "refresh")
+    const stored = await this.ctx.storage.get<TokenSet>("tokens")
+    if (stored?.refreshToken !== refreshToken) return stored?.accessToken ?? tokens.accessToken
     await this.ctx.storage.put("tokens", tokens)
     return tokens.accessToken
   }
@@ -72,11 +71,18 @@ export class OuraTokens extends DurableObject<Env> {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
         body: new URLSearchParams({ ...grant, client_id: this.env.OURA_CLIENT_ID, client_secret: this.env.OURA_CLIENT_SECRET }),
+        signal: AbortSignal.timeout(15_000),
       })
     } catch (error) {
       throw new Error(`Oura token request failed: ${error instanceof Error ? error.message : String(error)}`)
     }
-    const body = await responseBody(response)
+    const body = await readBody(response)
+    if (context === "refresh" && [400, 401, 403].includes(response.status)) {
+      // Dead refresh token: forget it so /health reports unauthorized — unless a re-link already replaced it.
+      const stored = await this.ctx.storage.get<TokenSet>("tokens")
+      if (stored?.refreshToken === grant.refresh_token) await this.ctx.storage.delete("tokens")
+      throw notAuthorized(this.env)
+    }
     if (!response.ok) throw new Error(`Oura token ${context} failed (HTTP ${response.status}). ${JSON.stringify(body)}`)
     if (typeof body !== "object" || body === null) throw new Error("Oura token response was not JSON.")
     const json = body as Record<string, unknown>

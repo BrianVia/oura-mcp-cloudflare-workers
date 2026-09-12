@@ -54,7 +54,7 @@ openssl rand -hex 32 | tee /dev/stderr | npx wrangler secret put MCP_BEARER   # 
 
 ### 4. Link your ring (once)
 
-Open `https://oura.example.com/oauth/start?token=<MCP_BEARER>` in a browser and approve. Then:
+Open `https://oura.example.com/oauth/start`, paste your `MCP_BEARER`, and approve. Then:
 
 ```sh
 curl -s https://oura.example.com/health   # → {"ok":true,"authorized":true,...}
@@ -108,7 +108,6 @@ npx wrangler dev                 # http://localhost:8787
 - Oura rate limit: 5000 requests / 5 min. Don't poll.
 - `OURA_SANDBOX=true` in `wrangler.jsonc` `vars` switches to Oura's demo data (no ring needed).
 - claude.ai web connectors need OAuth on the MCP side, not a static bearer; not supported. Put [`@cloudflare/workers-oauth-provider`](https://github.com/cloudflare/workers-oauth-provider) in front if you need that.
-- `/oauth/start` takes the bearer as a query parameter, so it lands in browser history. Acceptable for one user; rotate with `wrangler secret put MCP_BEARER` if it leaks.
 - No cache. Every tool call hits Oura live. Add D1/KV only if rate limits bite.
 
 ## License

@@ -3,6 +3,7 @@
   "name": "oura-mcp",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-12",
+  "observability": { "enabled": true },
   "vars": {
     "OURA_REDIRECT_URI": "https://oura.brianvia.com/oauth/callback",
     "OURA_SANDBOX": "false"

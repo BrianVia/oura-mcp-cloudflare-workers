@@ -18,8 +18,10 @@ app.get("/", (c) => c.text("oura-mcp — MCP endpoint: /mcp"))
 app.get("/privacy/", (c) => c.text("Privacy: this is a personal, single-user tool. Oura data is fetched on demand for the owner only, never stored beyond OAuth tokens, and never shared."))
 app.get("/tos", (c) => c.text("Terms: personal, single-user tool operated by its owner for their own Oura data. No service is offered to third parties."))
 app.get("/health", async (c) => c.json({ ok: true, ...await stub(c.env).status() }))
-app.get("/oauth/start", async (c) => {
-  if (!await same(c.req.query("token"), c.env.MCP_BEARER)) return c.json({ error: "Unauthorized" }, 401)
+app.get("/oauth/start", (c) => c.html("<form method=post><input type=password name=token autofocus><button>Link Oura</button></form>"))
+app.post("/oauth/start", async (c) => {
+  const token = (await c.req.parseBody()).token
+  if (!await same(typeof token === "string" ? token : undefined, c.env.MCP_BEARER)) return c.json({ error: "Unauthorized" }, 401)
   const url = new URL(AUTHORIZE_URL)
   url.searchParams.set("response_type", "code")
   url.searchParams.set("client_id", c.env.OURA_CLIENT_ID)

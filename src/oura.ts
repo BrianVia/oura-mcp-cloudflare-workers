@@ -10,14 +10,13 @@ export type CollectionDescriptor = {
   readonly name: string
   readonly kind: "daily" | "datetime" | "listOnly" | "singleton"
   readonly byId: boolean
-  readonly latest: boolean
   readonly description: string
 }
 
 const daily = (name: string, description: string): CollectionDescriptor =>
-  ({ name, kind: "daily", byId: true, latest: false, description })
+  ({ name, kind: "daily", byId: true, description })
 const datetime = (name: string, description: string): CollectionDescriptor =>
-  ({ name, kind: "datetime", byId: false, latest: true, description })
+  ({ name, kind: "datetime", byId: false, description })
 
 export const COLLECTIONS: readonly CollectionDescriptor[] = [
   daily("daily_activity", "Daily activity summary: steps, calories, activity score."),
@@ -37,9 +36,9 @@ export const COLLECTIONS: readonly CollectionDescriptor[] = [
   daily("rest_mode_period", "Rest mode periods (recovery/illness) the user enabled."),
   datetime("heartrate", "Time-series heart rate samples."),
   datetime("ring_battery_level", "Time-series ring battery level samples."),
-  { name: "ring_configuration", kind: "listOnly", byId: true, latest: false,
+  { name: "ring_configuration", kind: "listOnly", byId: true,
     description: "Ring hardware configuration records (size, color, firmware, design)." },
-  { name: "personal_info", kind: "singleton", byId: false, latest: false,
+  { name: "personal_info", kind: "singleton", byId: false,
     description: "The user's personal info: age, weight, height, biological sex, email." },
 ] as const
 
@@ -104,7 +103,7 @@ export const buildUrl = (apiBase: string, params: OuraDataParams, now: Date): st
   const q = new URLSearchParams()
   if (descriptor.kind === "daily") {
     if (params.start_date === undefined && params.end_date === undefined) {
-      q.set("start_date", fmtDate(new Date(now.getTime() - 7 * DAY_MS)))
+      q.set("start_date", fmtDate(new Date(now.getTime() - 6 * DAY_MS)))
       q.set("end_date", fmtDate(now))
     } else {
       if (params.start_date !== undefined) q.set("start_date", params.start_date)
@@ -123,6 +122,34 @@ export const buildUrl = (apiBase: string, params: OuraDataParams, now: Date): st
   if (params.next_token !== undefined) q.set("next_token", params.next_token)
   if (params.fields !== undefined) q.set("fields", params.fields)
   return q.size ? `${base}?${q}` : base
+}
+
+export const readBody = async (response: Response): Promise<unknown> => {
+  const text = await response.text()
+  try { return JSON.parse(text) } catch { return text || undefined }
+}
+
+type Row = Record<string, unknown>
+export const summarize = ({ dailySleep, readiness, activity, spo2, sleeps }: {
+  dailySleep: Row[]; readiness: Row[]; activity: Row[]; spo2: Row[]; sleeps: Row[]
+}) => {
+  const byDay = (rows: Row[]) => new Map(rows.map((row) => [row.day as string, row]))
+  const sleepScore = byDay(dailySleep), readinessByDay = byDay(readiness), activityByDay = byDay(activity), spo2ByDay = byDay(spo2)
+  const sleepByDay = new Map<string, Row>()
+  for (const sleep of sleeps) if (sleep.type === "long_sleep") {
+    const prior = sleepByDay.get(sleep.day as string)
+    if (!prior || Number(sleep.total_sleep_duration) > Number(prior.total_sleep_duration)) sleepByDay.set(sleep.day as string, sleep)
+  }
+  const days = new Set([...sleepScore.keys(), ...readinessByDay.keys(), ...activityByDay.keys(), ...spo2ByDay.keys(), ...sleepByDay.keys()])
+  const value = (record: Row | undefined, key: string) => record?.[key] ?? null
+  return [...days].sort().map((day) => {
+    const detailed = sleepByDay.get(day), oxygen = spo2ByDay.get(day)?.spo2_percentage as Row | undefined
+    const seconds = value(detailed, "total_sleep_duration")
+    return { day, sleep_score: value(sleepScore.get(day), "score"), readiness_score: value(readinessByDay.get(day), "score"),
+      activity_score: value(activityByDay.get(day), "score"), steps: value(activityByDay.get(day), "steps"), spo2_avg: oxygen?.average ?? null,
+      hrv_avg: value(detailed, "average_hrv"), rhr: value(detailed, "lowest_heart_rate"),
+      total_sleep_h: typeof seconds === "number" ? Math.round(seconds / 36) / 100 : null }
+  })
 }
 
 export const httpMessage = (status: number, detail: unknown): string => {
