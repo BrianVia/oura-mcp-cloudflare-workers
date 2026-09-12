@@ -1,4 +1,4 @@
-# oura-mcp
+# oura-mcp-cloudflare-workers
 
 A remote [MCP](https://modelcontextprotocol.io/) server for your Oura Ring, running entirely on Cloudflare Workers. Deploy it, link your ring once, and any MCP client (Claude Code, Codex, curl) can ask about your sleep, readiness, HRV, activity, and SpO2.
 
