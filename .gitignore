@@ -4,3 +4,4 @@ upstream/
 .dev.vars
 CODEX-LAST.md
 dist/
+wrangler.local.jsonc

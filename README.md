@@ -22,14 +22,14 @@ The domain logic (collection table, parameter validation, URL building) is porte
 
 ### 1. Pick a domain
 
-Edit two lines in `wrangler.jsonc` to your own hostname on a zone you manage in Cloudflare:
+Copy `wrangler.jsonc` to `wrangler.local.jsonc` (gitignored) and change two lines to your own hostname on a zone you manage in Cloudflare:
 
 ```jsonc
 "OURA_REDIRECT_URI": "https://oura.example.com/oauth/callback",
 "routes": [{ "pattern": "oura.example.com", "custom_domain": true }]
 ```
 
-The custom-domain route creates the DNS record on first deploy. No manual DNS.
+Deploy with `WRANGLER_CONFIG=wrangler.local.jsonc npm run deploy` (or just edit `wrangler.jsonc` in place if you don't care about keeping your domain out of git). The custom-domain route creates the DNS record on first deploy. No manual DNS.
 
 ### 2. Register an Oura app
 

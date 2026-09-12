@@ -5,12 +5,12 @@
   "compatibility_date": "2026-09-12",
   "observability": { "enabled": true },
   "vars": {
-    "OURA_REDIRECT_URI": "https://oura.brianvia.com/oauth/callback",
+    "OURA_REDIRECT_URI": "https://oura.example.com/oauth/callback",
     "OURA_SANDBOX": "false"
   },
   "durable_objects": {
     "bindings": [{ "name": "OURA_TOKENS", "class_name": "OuraTokens" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OuraTokens"] }],
-  "routes": [{ "pattern": "oura.brianvia.com", "custom_domain": true }]
+  "routes": [{ "pattern": "oura.example.com", "custom_domain": true }]
 }
