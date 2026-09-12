@@ -1,0 +1,6 @@
+node_modules/
+upstream/
+.wrangler/
+.dev.vars
+CODEX-LAST.md
+dist/
